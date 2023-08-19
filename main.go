@@ -3,11 +3,16 @@ package simpleBlockchain
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	mux2 "github.com/gorilla/mux"
+	"encoding/json"
+	"github.com/joho/godotenv"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/gorilla/mux"
 )
 
 type Block struct {
@@ -16,6 +21,10 @@ type Block struct {
 	BPM       int
 	Hash      string
 	PrevHash  string
+}
+
+type Message struct {
+	BPM int
 }
 
 var Blockchain []Block
@@ -67,7 +76,7 @@ func replaceChain(newBlocks []Block) {
 }
 
 func run() error {
-	mux := mux2.NewRouter()
+	mux := makeMuxRouter()
 	httpAddr := os.Getenv("PORT")
 	log.Println("Listening on", os.Getenv("PORT"))
 
@@ -84,4 +93,73 @@ func run() error {
 	}
 
 	return nil
+}
+
+func makeMuxRouter() http.Handler {
+	muxRouter := mux.NewRouter()
+	muxRouter.HandleFunc("/", handleGetBlockchain).Methods("Get")
+	muxRouter.HandleFunc("/", handleWriteBlock).Methods("POST")
+	return muxRouter
+}
+
+func handleGetBlockchain(writer http.ResponseWriter, request *http.Request) {
+	bytes, err := json.MarshalIndent(Blockchain, "", " ")
+	if err != nil {
+		http.Error(writer, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	io.WriteString(writer, string(bytes))
+}
+
+func handleWriteBlock(writer http.ResponseWriter, request *http.Request) {
+	var mensage Message
+	decoder := json.NewDecoder(request.Body)
+	if err := decoder.Decode(&mensage); err != nil {
+		respondWithJSON(writer, request, http.StatusBadRequest, request.Body)
+		return
+	}
+
+	defer request.Body.Close()
+
+	newBlock, err := generateBlock(Blockchain[len(Blockchain)-1], mensage.BPM)
+	if err != nil {
+		respondWithJSON(writer, request, http.StatusInternalServerError, mensage)
+		return
+	}
+
+	if isBlockValid(newBlock, Blockchain[len(Blockchain)-1]) {
+		newBlockchain := append(Blockchain, newBlock)
+		replaceChain(newBlockchain)
+		spew.Dump(Blockchain)
+	}
+
+	respondWithJSON(writer, request, http.StatusCreated, newBlock)
+}
+
+func respondWithJSON(writer http.ResponseWriter, request *http.Request, code int, payload interface{}) {
+	response, err := json.MarshalIndent(payload, "", " ")
+	if err != nil {
+		writer.WriteHeader(http.StatusInternalServerError)
+		writer.Write([]byte("HTTP 500: Internal Server Error"))
+		return
+	}
+
+	writer.WriteHeader(code)
+	writer.Write(response)
+}
+
+func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	go func() {
+		t := time.Now()
+		genesisBlock := Block{0, t.String(), 0, "", ""}
+		spew.Dump(genesisBlock)
+		Blockchain = append(Blockchain, genesisBlock)
+	}()
+
+	log.Fatal(run())
 }

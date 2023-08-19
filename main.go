@@ -3,6 +3,10 @@ package simpleBlockchain
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	mux2 "github.com/gorilla/mux"
+	"log"
+	"net/http"
+	"os"
 	"time"
 )
 
@@ -60,4 +64,24 @@ func replaceChain(newBlocks []Block) {
 	if len(newBlocks) > len(Blockchain) {
 		Blockchain = newBlocks
 	}
+}
+
+func run() error {
+	mux := mux2.NewRouter()
+	httpAddr := os.Getenv("PORT")
+	log.Println("Listening on", os.Getenv("PORT"))
+
+	s := &http.Server{
+		Addr:           ":" + httpAddr,
+		Handler:        mux,
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	}
+
+	if err := s.ListenAndServe(); err != nil {
+		return err
+	}
+
+	return nil
 }

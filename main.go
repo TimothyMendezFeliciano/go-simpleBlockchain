@@ -3,6 +3,7 @@ package simpleBlockchain
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"time"
 )
 
 type Block struct {
@@ -22,4 +23,18 @@ func calculateHash(block Block) string {
 	hashed := hash.Sum(nil)
 
 	return hex.EncodeToString(hashed)
+}
+
+func generateBlock(oldBlock Block, BPM int) (Block, error) {
+
+	var newBlock Block
+
+	currentTime := time.Now()
+
+	newBlock.Index = oldBlock.Index + 1
+	newBlock.Timestamp = currentTime.String()
+	newBlock.BPM = BPM
+	newBlock.Hash = calculateHash(newBlock)
+
+	return newBlock, nil
 }

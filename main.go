@@ -34,7 +34,24 @@ func generateBlock(oldBlock Block, BPM int) (Block, error) {
 	newBlock.Index = oldBlock.Index + 1
 	newBlock.Timestamp = currentTime.String()
 	newBlock.BPM = BPM
+	newBlock.PrevHash = oldBlock.Hash
 	newBlock.Hash = calculateHash(newBlock)
 
 	return newBlock, nil
+}
+
+func isBlockValid(newBlock, oldBlock Block) bool {
+	if oldBlock.Index+1 != newBlock.Index {
+
+		return false
+	}
+	if oldBlock.Hash != newBlock.PrevHash {
+		return false
+	}
+
+	if calculateHash(newBlock) != newBlock.Hash {
+		return false
+	}
+
+	return true
 }
